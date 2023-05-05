@@ -1,0 +1,60 @@
+public class DemoDataCreator {
+
+    //...
+
+    private User createUser(String username) {
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+        String usernameKey = String.format("username:%s", username);
+
+        // Yeah, bcrypt generally ins't used in .NET, this one is mainly added to be compatible with Node and Python demo servers.
+        String hashedPassword = encoder.encode(DEMO_PASSWORD);
+
+        Integer nextId = redisTemplate.opsForValue().increment("total_users").intValue();
+        String userKey = String.format("user:%s", nextId);
+
+        redisTemplate.opsForValue().set(usernameKey, userKey);
+        redisTemplate.opsForHash().put(userKey, "username", username);
+        redisTemplate.opsForHash().put(userKey, "password", hashedPassword);
+
+        String roomsKey = String.format("user:%s:rooms", nextId);
+        redisTemplate.opsForSet().add(roomsKey, "0");
+
+        return new User(
+                nextId,
+                username,
+                false
+        );
+    }
+    //...
+}
+public class RedisAppConfig {
+
+    //...
+
+    public RedisConnectionFactory redisConnectionFactory() {
+        // Read environment variables
+        String endpointUrl = System.getenv("REDIS_ENDPOINT_URL");
+        if (endpointUrl == null) {
+            endpointUrl = "127.0.0.1:6379";
+        }
+        String password = System.getenv("REDIS_PASSWORD");
+
+        String[] urlParts = endpointUrl.split(":");
+
+        String host = urlParts[0];
+        String port = "6379";
+
+        if (urlParts.length > 1) {
+            port = urlParts[1];
+        }
+
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(host, Integer.parseInt(port));
+
+        System.out.printf("Connecting to %s:%s with password: %s%n", host, port, password);
+
+        if (password != null) {
+            config.setPassword(password);
+        }
+        return new LettuceConnectionFactory(config);
+    }
+}
